@@ -1,0 +1,251 @@
+CORS (Cross Origin Resource Sharing)
+Es un estándar que surgió para generar una flexibilización sobre la política de seguridad de mismo origen, esto permite que se puedan retornar peticiones que se realizan de diferentes dominios.
+A nivel de Web APIS en .NET Core, el estándar CORS nos permite que el API pueda ser consumido desde diferentes dominios, los cuales fueron especificados a nivel de la configuración del web api.
+
+En general el uso de politicas en ASP.NET se puede configurar de diferentes formas, detallo algunas de las mas comunues par el uso de CORS.
+
+-CORS con un nombre de política en específico:
+
+public class Startup
+{
+	// Aqui se define el nombre de la politica _myAllowSpecificOrigins
+    readonly string MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+		//Aqui se realiza el AddCors para la politica especificada
+        services.AddCors(options =>
+        {
+            options.AddPolicy(name: MyAllowSpecificOrigins,
+                              builder =>
+                              {
+                                  builder.WithOrigins("http://example.com",
+                                                      "http://www.contoso.com");
+                              });
+        });
+
+        // services.AddResponseCaching();
+        services.AddControllers();
+    }
+
+    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+    {
+        if (env.IsDevelopment())
+        {
+            app.UseDeveloperExceptionPage();
+        }
+
+        app.UseHttpsRedirection();
+        app.UseStaticFiles();
+        app.UseRouting();
+		
+		//Aqui se realiza el llamado a la configuracion CORS, es importante colocarla entre el UseRouting y el UseEndpoints
+        app.UseCors(MyAllowSpecificOrigins);
+
+        // app.UseResponseCaching();
+
+        app.UseAuthorization();
+
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapControllers();
+        });
+    }
+}
+
+-CORS con una politica por defecto:
+
+public class Startup
+{
+    public void ConfigureServices(IServiceCollection services)
+    {
+		//Aqui se realiza el AddCors para una politica por defecto
+        services.AddCors(options =>
+        {
+            options.AddDefaultPolicy(
+                builder =>
+                {
+                    builder.WithOrigins("http://example.com",
+                                        "http://www.contoso.com");
+                });
+        });
+
+        services.AddControllers();
+    }
+
+    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+    {
+        if (env.IsDevelopment())
+        {
+            app.UseDeveloperExceptionPage();
+        }
+
+        app.UseHttpsRedirection();
+        app.UseStaticFiles();
+        app.UseRouting();
+
+		//Aqui se realiza el llamado a la configuracion CORS, es importante colocarla entre el UseRouting y el UseEndpoints
+        app.UseCors();
+
+        app.UseAuthorization();
+
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapControllers();
+        });
+    }
+}
+
+-CORS con endpoint routing:
+
+public class Startup
+{
+    readonly string MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddCors(options =>
+        {
+            options.AddPolicy(name: MyAllowSpecificOrigins,
+                              builder =>
+                              {
+                                  builder.WithOrigins("http://example.com",
+                                                      "http://www.contoso.com");
+                              });
+        });
+
+        services.AddControllers();
+        services.AddRazorPages();
+    }
+
+    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+    {
+        if (env.IsDevelopment())
+        {
+            app.UseDeveloperExceptionPage();
+        }
+
+        app.UseHttpsRedirection();
+        app.UseStaticFiles();
+        app.UseRouting();
+
+        app.UseCors();
+
+        app.UseAuthorization();
+
+        app.UseEndpoints(endpoints =>
+        {
+			//Aqui se define el CORS en el endpoint de diferentes maneras
+            endpoints.MapGet("/echo",
+                context => context.Response.WriteAsync("echo"))
+                .RequireCors(MyAllowSpecificOrigins);
+
+            endpoints.MapControllers()
+                     .RequireCors(MyAllowSpecificOrigins);
+
+            endpoints.MapGet("/echo2",
+                context => context.Response.WriteAsync("echo2"));
+
+            endpoints.MapRazorPages();
+        });
+    }
+}
+
+-CORS a nivel de metodos en el controller:
+
+[Route("api/[controller]")]
+[ApiController]
+public class WidgetController : ControllerBase
+{
+    // GET api/values
+	// Aqui se indica cual politica de CORS se va a usar a nivel de la accion de la operacion GET
+	// La politica AnotherPolicy esta definida en la clase Startup
+    [EnableCors("AnotherPolicy")]
+    [HttpGet]
+    public ActionResult<IEnumerable<string>> Get()
+    {
+        return new string[] { "green widget", "red widget" };
+    }
+
+    // GET api/values/5
+	// Aqui de igual forma que el anterior se indica cual politica se desea usar para la accion de la operacion GET
+    [EnableCors("Policy1")]
+    [HttpGet("{id}")]
+    public ActionResult<string> Get(int id)
+    {
+        return id switch
+        {
+            1 => "green widget",
+            2 => "red widget",
+            _ => NotFound(),
+        };
+    }
+	
+	// GET: api/values/GetValues2
+	// Aqui se indica como deshabilitar CORS para una operacion en específico
+    [DisableCors]
+    [HttpGet("{action}")]
+    public IActionResult GetValues2() =>
+        ControllerContext.MyDisplayRouteInfo();
+}
+
+public class Startup
+{
+    public Startup(IConfiguration configuration)
+    {
+        Configuration = configuration;
+    }
+
+    public IConfiguration Configuration { get; }
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddCors(options =>
+        {
+            options.AddPolicy("Policy1",
+                builder =>
+                {
+                    builder.WithOrigins("http://example.com",
+                                        "http://www.contoso.com");
+                });
+
+            options.AddPolicy("AnotherPolicy",
+                builder =>
+                {
+                    builder.WithOrigins("http://www.contoso.com")
+                                        .AllowAnyHeader()
+                                        .AllowAnyMethod();
+                });
+        });
+
+        services.AddControllers();
+    }
+
+    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+    {
+        if (env.IsDevelopment())
+        {
+            app.UseDeveloperExceptionPage();
+        }
+
+        app.UseHttpsRedirection();
+
+        app.UseRouting();
+
+        app.UseCors();
+
+        app.UseAuthorization();
+
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapControllers();
+        });
+    }
+}
+
+
+Fuente:
+https://docs.microsoft.com/es-es/aspnet/core/security/cors?view=aspnetcore-5.0#set-the-allowed-origins
+
+
+

@@ -1,0 +1,40 @@
+Fluent Validation
+Es una librería de .NET para construir reglas de validaciones.
+Se puede hacer uso de esta librería instalando el NuGet Package por medio del administrador de NuGet de Visual Studio
+O por medio de consola ingresando el siguiente comando dentro de su proyecto.
+dotnet add package FluentValidation
+
+Puede ser muy útil el uso de esta librería para facilitar las validaciones de los objetos JSON que se reciben a nivel de los métodos del API
+
+Ejemplo de uso de fluent validation:
+
+using FluentValidation;
+
+public class Customer {
+  public int Id { get; set; }
+  public string Surname { get; set; }
+  public string Forename { get; set; }
+  public decimal Discount { get; set; }
+  public string Address { get; set; }
+}
+
+public class CustomerValidator: AbstractValidator<Customer> {
+  public CustomerValidator() {
+    RuleFor(x => x.Surname).NotEmpty();
+    RuleFor(x => x.Forename).NotEmpty().WithMessage("Please specify a first name");
+    RuleFor(x => x.Discount).NotEqual(0).When(x => x.HasDiscount);
+    RuleFor(x => x.Address).Length(20, 250);
+    RuleFor(x => x.Postcode).Must(BeAValidPostcode).WithMessage("Please specify a valid postcode");
+  }
+
+  private bool BeAValidPostcode(string postcode) {
+    // custom postcode validating logic goes here
+  }
+}
+
+var customer = new Customer();
+var validator = new CustomerValidator();
+ValidationResult results = validator.Validate(customer);
+
+bool success = results.IsValid;
+IList<ValidationFailure> failures = results.Errors;
